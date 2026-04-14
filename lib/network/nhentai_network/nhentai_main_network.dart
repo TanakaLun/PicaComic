@@ -89,31 +89,42 @@ class NhentaiNetwork {
     }
   }
 
-  NhentaiComicBrief parseComic(Element comicDom) {
-    var img = comicDom.querySelector("a > img")!.attributes["src"]!;
-    var name = comicDom.querySelector("div.caption")!.text;
-    var id = comicDom.querySelector("a")!.attributes["href"]!.nums;
-    var lang = "Unknown";
-    var tags = comicDom.attributes["data-tags"] ?? "";
-    if (tags.contains("12227")) {
-      lang = "English";
-    } else if (tags.contains("6346")) {
-      lang = "日本語";
-    } else if (tags.contains("29963")) {
-      lang = "中文";
-    }
-    var tagsRes = <String>[];
-    for (var tag in tags.split(" ")) {
-      if (nhentaiTags[tag] != null) {
-        tagsRes.add(nhentaiTags[tag]!);
+  NhentaiComicBrief? parseComic(Element comicDom) {
+    try {
+      var id = comicDom.attributes["data-id"] ?? 
+               comicDom.querySelector("a")?.attributes["href"]?.nums ?? "";
+      
+      if (id.isEmpty) return null;
+
+      var imgElement = comicDom.querySelector("img.lazyload") ?? comicDom.querySelector("img");
+      var img = imgElement?.attributes["data-src"] ?? imgElement?.attributes["src"] ?? "";
+
+      var name = comicDom.querySelector(".caption")?.text ?? "Unknown";
+
+      var lang = "Unknown";
+      var tags = comicDom.attributes["data-tags"] ?? "";
+      if (tags.contains("12227")) {
+        lang = "English";
+      } else if (tags.contains("6346")) {
+        lang = "日本語";
+      } else if (tags.contains("29963")) {
+        lang = "中文";
       }
+      
+      var tagsRes = <String>[];
+      for (var tag in tags.split(" ")) {
+        if (nhentaiTags[tag] != null) {
+          tagsRes.add(nhentaiTags[tag]!);
+        }
+      }
+      return NhentaiComicBrief(name, img, id, lang, tagsRes);
+    } catch (e) {
+      return null;
     }
-    return NhentaiComicBrief(name, img, id, lang, tagsRes);
   }
 
   List<T> removeNullValue<T extends Object>(List<T?> list) {
-    while (list.remove(null)) {}
-    return List.from(list);
+    return list.whereType<T>().toList();
   }
 
   Future<Res<NhentaiHomePageData>> getHomePage([int? page]) async {
@@ -137,12 +148,10 @@ class NhentaiNetwork {
       var latest = document
           .querySelectorAll("div.container.index-container > div.gallery");
 
-      return Res(NhentaiHomePageData(
-        removeNullValue(List.generate(
-            popularDoms.length, (index) => parseComic(popularDoms[index]))),
-        removeNullValue(List.generate(latest.length - popularDoms.length,
-            (index) => parseComic(latest[index + popularDoms.length]))),
-      ));
+      var popularList = popularDoms.map((e) => parseComic(e)).whereType<NhentaiComicBrief>().toList();
+      var latestList = latest.skip(popularDoms.length).map((e) => parseComic(e)).whereType<NhentaiComicBrief>().toList();
+
+      return Res(NhentaiHomePageData(popularList, latestList));
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
@@ -156,12 +165,9 @@ class NhentaiNetwork {
     }
     try {
       var document = parse(res.data);
-
       var latest = document.querySelectorAll("div.gallery");
-
-      data.latest.addAll(removeNullValue(
-          List.generate(latest.length, (index) => parseComic(latest[index]))));
-
+      
+      data.latest.addAll(latest.map((e) => parseComic(e)).whereType<NhentaiComicBrief>());
       data.page++;
 
       return const Res(true);
@@ -185,30 +191,22 @@ class NhentaiNetwork {
     }
     try {
       var document = parse(res.data);
-
       var comicDoms = document.querySelectorAll("div.gallery");
-
-      var lastPagination = document
-          .querySelector("section.pagination > a.last")
-          ?.attributes["href"]
-          ?.nums;
+      
+      var paginationLinks = document.querySelectorAll("section.pagination > a");
+      var lastPagination = paginationLinks.isNotEmpty 
+          ? paginationLinks.last.attributes["href"]?.nums 
+          : "1";
 
       Future.microtask(() {
         try {
           StateController.find<PreSearchController>().update();
-        } catch (e) {
-          //
-        }
+        } catch (e) {}
       });
 
-      if (comicDoms.isEmpty) {
-        return const Res([], subData: 0);
-      }
-
       return Res(
-          removeNullValue(List.generate(
-              comicDoms.length, (index) => parseComic(comicDoms[index]))),
-          subData: lastPagination == null ? 1 : int.parse(lastPagination));
+          comicDoms.map((e) => parseComic(e)).whereType<NhentaiComicBrief>().toList(),
+          subData: int.tryParse(lastPagination ?? "1") ?? 1);
     } catch (e, s) {
       LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
       return Res(null, errorMessage: "Failed to Parse Data: $e");
@@ -219,9 +217,6 @@ class NhentaiNetwork {
     Res<String> res;
     if (id == "") {
       res = await get("$baseUrl/random");
-      if (res.error) {
-        return Res.fromErrorRes(res);
-      }
     } else {
       res = await get("$baseUrl/g/$id/");
     }
@@ -238,21 +233,17 @@ class NhentaiNetwork {
       }
 
       var document = parse(res.data);
-      
       id = id == "" ? document.querySelector("h3#gallery_id")!.text.nums : id;
 
-      var cover = document
-          .querySelector("div#cover > a > img")!
-          .attributes["src"]!;
+      var coverElement = document.querySelector("div#cover > a > img");
+      var cover = coverElement?.attributes["data-src"] ?? coverElement?.attributes["src"] ?? "";
 
-      var title = combineSpans(document.querySelector("h1.title")!);
-
+      var title = combineSpans(document.querySelector("h1.title"));
       var subTitle = combineSpans(document.querySelector("h2.title"));
 
       Map<String, List<String>> tags = {};
       for (var field in document.querySelectorAll("div.tag-container")) {
-        var fieldName =
-            field.firstChild!.text!.removeAllBlank.replaceLast(":", "");
+        var fieldName = field.firstChild?.text?.removeAllBlank.replaceLast(":", "") ?? "Unknown";
         if (fieldName == "Uploaded") {
           var timeStr = document.querySelector("time")?.attributes["datetime"];
           if (timeStr != null) {
@@ -260,37 +251,22 @@ class NhentaiNetwork {
             continue;
           }
         }
-        tags[fieldName] = [];
-        for (var span in field.querySelectorAll("span.name")) {
-          tags[fieldName]!.add(span.text);
-        }
+        tags[fieldName] = field.querySelectorAll("span.name").map((e) => e.text).toList();
       }
 
-      bool favorite =
-          document.querySelector("button#favorite > span.text")?.text !=
-                  "Favorite" &&
-              logged;
+      bool favorite = document.querySelector("button#favorite > span.text")?.text != "Favorite" && logged;
 
-      var thumbnails = <String>[];
-      for (var t in document.querySelectorAll("a.gallerythumb > img")) {
-        thumbnails.add(t.attributes["src"]!);
-      }
+      var thumbnails = document.querySelectorAll("a.gallerythumb > img")
+          .map((e) => e.attributes["data-src"] ?? e.attributes["src"] ?? "").toList();
 
-      var recommendations = <NhentaiComicBrief>[];
-      for (var comic in document.querySelectorAll("div.gallery")) {
-        var c = parseComic(comic);
-        recommendations.add(c);
-      }
+      var recommendations = document.querySelectorAll("div.gallery")
+          .map((e) => parseComic(e)).whereType<NhentaiComicBrief>().toList();
+
       String token = "";
       try {
-        var script = document
-            .querySelectorAll("script")
-            .firstWhere((element) => element.text.contains("csrf_token"))
-            .text;
+        var script = document.querySelectorAll("script").firstWhere((element) => element.text.contains("csrf_token")).text;
         token = script.split("csrf_token: \"")[1].split("\",")[0];
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
 
       return Res(NhentaiComic(id, title, subTitle, cover, tags, favorite,
           thumbnails, recommendations, token));
@@ -302,82 +278,58 @@ class NhentaiNetwork {
 
   Future<Res<List<NhentaiComment>>> getComments(String id) async {
     var res = await get("$baseUrl/api/gallery/$id/comments");
-    if (res.error) {
-      return Res.fromErrorRes(res);
-    }
+    if (res.error) return Res.fromErrorRes(res);
     try {
-      var json = const JsonDecoder().convert(res.data);
-      var comments = <NhentaiComment>[];
-      for (var c in json) {
-        comments.add(NhentaiComment(
-            c["poster"]["username"],
-            "https://i3.nhentai.net/${c["poster"]["avatar_url"]}",
-            c["body"],
-            c["post_date"]));
-      }
-      return Res(comments);
-    } catch (e, s) {
-      LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
-      return Res(null, errorMessage: "Failed to Parse Data: $e");
+      var json = jsonDecode(res.data!);
+      return Res((json as List).map((c) => NhentaiComment(
+          c["poster"]["username"],
+          "https://i3.nhentai.net/${c["poster"]["avatar_url"]}",
+          c["body"],
+          c["post_date"])).toList());
+    } catch (e) {
+      return Res(null, errorMessage: e.toString());
     }
   }
 
   Future<Res<List<String>>> getImages(String id) async {
-    var res = await get("$baseUrl/g/$id/1/");
-    if (res.error) {
-      return Res.fromErrorRes(res);
-    }
+    var res = await get("$baseUrl/g/$id/");
+    if (res.error) return Res.fromErrorRes(res);
+    
     try {
       var document = parse(res.data);
-      var scripts = document
-          .querySelectorAll("script");
+      var script = document.querySelectorAll("script").firstWhere((e) => e.text.contains("window._gdata")).text;
+      var jsonStr = script.split("window._gdata = ")[1].split(";")[0];
+      var galleryData = jsonDecode(jsonStr);
 
-      var script = scripts
-          .firstWhere((element) => element.text.contains("media_id"))
-          .text;
-
-      var galleryData = json.decode(json.decode(script)["body"]);
-
-      var url = document
-          .querySelector("#image-container > a > img")!.attributes["src"]!;
-
-      String baseUrl = url.split('/galleries')[0];
-
+      String mediaId = galleryData["media_id"].toString();
       var images = <String>[];
-      for (var image in galleryData["pages"]) {
-        images.add("$baseUrl/${image["path"]}");
+      
+      for (int i = 0; i < (galleryData["pages"] as List).length; i++) {
+        var page = galleryData["pages"][i];
+        String ext = page["t"] == "p" ? "png" : (page["t"] == "j" ? "jpg" : "gif");
+        images.add("https://i.nhentai.net/galleries/$mediaId/${i + 1}.$ext");
       }
 
       return Res(images);
-    } catch (e, s) {
-      LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
-      return Res(null, errorMessage: "Failed to Parse Data: $e");
+    } catch (e) {
+      return Res(null, errorMessage: "Failed to parse images: $e");
     }
   }
 
-  // 一页 25 个
   Future<Res<List<NhentaiComicBrief>>> getFavorites(int page) async {
-    if (!logged) {
-      return const Res(null, errorMessage: "login required");
-    }
+    if (!logged) return const Res(null, errorMessage: "login required");
     var res = await get("$baseUrl/favorites/?page=$page");
-    if (res.error) {
-      return Res.fromErrorRes(res);
-    }
+    if (res.error) return Res.fromErrorRes(res);
     try {
       var document = parse(res.data);
       var comics = document.querySelectorAll("div.gallery");
-      var lastPagination = document
-          .querySelector("section.pagination > a.last")
-          ?.attributes["href"]
-          ?.nums;
+      var paginationLinks = document.querySelectorAll("section.pagination > a");
+      var lastPagination = paginationLinks.isNotEmpty ? paginationLinks.last.attributes["href"]?.nums : "1";
       return Res(
-          removeNullValue(List.generate(
-              comics.length, (index) => parseComic(comics[index]))),
-          subData: lastPagination == null ? 1 : int.parse(lastPagination));
-    } catch (e, s) {
-      LogManager.addLog(LogLevel.error, "Data Analyse", "$e\n$s");
-      return Res(null, errorMessage: "Failed to Parse Data: $e");
+          comics.map((e) => parseComic(e)).whereType<NhentaiComicBrief>().toList(),
+          subData: int.tryParse(lastPagination ?? "1") ?? 1);
+    } catch (e) {
+      return Res(null, errorMessage: e.toString());
     }
   }
 
