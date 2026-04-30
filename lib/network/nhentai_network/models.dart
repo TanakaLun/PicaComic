@@ -49,37 +49,41 @@ class NhentaiComic with HistoryMixin {
   String token;
   List<String> pages;
 
-  NhentaiComic(
-    this.id,
-    this.title,
-    this.subTitle,
-    this.cover,
-    this.tags,
-    this.favorite,
-    this.thumbnails,
-    this.recommendations,
-    this.token,
-    [this.pages = const []],
-  );
+  NhentaiComic({
+    required this.id,
+    required this.title,
+    required this.subTitle,
+    required this.cover,
+    required this.tags,
+    required this.favorite,
+    required this.thumbnails,
+    required this.recommendations,
+    required this.token,
+    this.pages = const [],
+  });
 
+  factory NhentaiComic.fromMap(Map<String, dynamic> map) {
+    return NhentaiComic(
+      id: map["id"] ?? "",
+      title: map["title"] ?? "",
+      subTitle: map["subTitle"] ?? "",
+      cover: map["cover"] ?? "",
+      tags: {},
+      favorite: false,
+      thumbnails: [],
+      recommendations: [],
+      token: "",
+      pages: [],
+    );
+  }
+
+  @override
   Map<String, dynamic> toMap() => {
         "id": id,
         "title": title,
         "subTitle": subTitle,
         "cover": cover,
       };
-
-  NhentaiComic.fromMap(Map<String, dynamic> map)
-      : id = map["id"],
-        title = map["title"],
-        subTitle = map["subTitle"],
-        cover = map["cover"],
-        tags = {},
-        favorite = false,
-        thumbnails = [],
-        recommendations = [],
-        token = "",
-        pages = [];
 
   @override
   HistoryType get historyType => HistoryType.nhentai;
