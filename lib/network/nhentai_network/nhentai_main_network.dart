@@ -113,7 +113,13 @@ class NhentaiNetwork {
         .map((id) => nhentaiTags[id.toString()]!)
         .toList();
 
-    return NhentaiComicBrief(title, cover, id, lang, tags);
+    return NhentaiComicBrief(
+      title: title,
+      cover: cover,
+      id: id,
+      lang: lang,
+      tags: tags,
+    );
   }
 
   Future<Res<NhentaiHomePageData>> getHomePage([int? page]) async {
@@ -228,16 +234,16 @@ class NhentaiNetwork {
     var recommendations = relatedList.map((r) => _parseComicFromApi(r)).toList();
 
     return Res(NhentaiComic(
-      comicId,
-      title,
-      subTitle,
-      cover,
-      tagsMap,
-      favorite,
-      thumbnails,
-      recommendations,
-      token,
-      pageUrls,
+      id: comicId,
+      title: title,
+      subTitle: subTitle,
+      cover: cover,
+      tags: tagsMap,
+      favorite: favorite,
+      thumbnails: thumbnails,
+      recommendations: recommendations,
+      token: token,
+      pages: pageUrls,
     ));
   }
 
@@ -285,7 +291,14 @@ class NhentaiNetwork {
       else if (lang == "cn") lang = "中文";
       else if (lang == "jp") lang = "日本語";
 
-      comics.add(NhentaiComicBrief(title, img, id, lang, []));
+      // 修复：使用具名参数
+      comics.add(NhentaiComicBrief(
+        title: title,
+        cover: img,
+        id: id,
+        lang: lang,
+        tags: const [],
+      ));
     }
 
     var paginationLinks = document.querySelectorAll("section.pagination > a");
