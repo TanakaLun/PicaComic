@@ -3,7 +3,7 @@ import 'package:pica_comic/foundation/history.dart';
 import 'package:pica_comic/network/base_comic.dart';
 
 @immutable
-class NhentaiComicBrief extends BaseComic{
+class NhentaiComicBrief extends BaseComic {
   @override
   final String title;
   @override
@@ -26,7 +26,7 @@ class NhentaiComicBrief extends BaseComic{
   bool get enableTagsTranslation => true;
 }
 
-class NhentaiHomePageData{
+class NhentaiHomePageData {
   final List<NhentaiComicBrief> popular;
   List<NhentaiComicBrief> latest;
   int page = 1;
@@ -34,7 +34,7 @@ class NhentaiHomePageData{
   NhentaiHomePageData(this.popular, this.latest);
 }
 
-class NhentaiComic with HistoryMixin{
+class NhentaiComic with HistoryMixin {
   String id;
   @override
   String title;
@@ -47,27 +47,39 @@ class NhentaiComic with HistoryMixin{
   List<String> thumbnails;
   List<NhentaiComicBrief> recommendations;
   String token;
+  List<String> pages;
 
-  NhentaiComic(this.id, this.title, this.subTitle, this.cover, this.tags, this.favorite,
-      this.thumbnails, this.recommendations, this.token);
+  NhentaiComic(
+    this.id,
+    this.title,
+    this.subTitle,
+    this.cover,
+    this.tags,
+    this.favorite,
+    this.thumbnails,
+    this.recommendations,
+    this.token,
+    this.pages,
+  );
 
   Map<String, dynamic> toMap() => {
-    "id": id,
-    "title": title,
-    "subTitle": subTitle,
-    "cover": cover,
-  };
+        "id": id,
+        "title": title,
+        "subTitle": subTitle,
+        "cover": cover,
+      };
 
-  NhentaiComic.fromMap(Map<String, dynamic> map):
-      id = map["id"],
-      title = map["title"],
-      subTitle = map["subTitle"],
-      cover = map["cover"],
-      tags = {},
-      favorite = false,
-      thumbnails = [],
-      recommendations = [],
-      token = "";
+  NhentaiComic.fromMap(Map<String, dynamic> map)
+      : id = map["id"],
+        title = map["title"],
+        subTitle = map["subTitle"],
+        cover = map["cover"],
+        tags = {},
+        favorite = false,
+        thumbnails = [],
+        recommendations = [],
+        token = "",
+        pages = [];
 
   @override
   HistoryType get historyType => HistoryType.nhentai;
@@ -76,7 +88,7 @@ class NhentaiComic with HistoryMixin{
   String get target => id;
 }
 
-class NhentaiComment{
+class NhentaiComment {
   String userName;
   String avatar;
   String content;
