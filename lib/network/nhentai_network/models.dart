@@ -59,7 +59,7 @@ class NhentaiComic with HistoryMixin {
     this.thumbnails,
     this.recommendations,
     this.token,
-    this.pages,
+    [this.pages = const []],
   );
 
   Map<String, dynamic> toMap() => {

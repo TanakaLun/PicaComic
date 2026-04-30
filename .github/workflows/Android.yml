@@ -1,7 +1,8 @@
 name: Build Android
 run-name: Build Android arm64-v8a
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+  push:
 
 jobs:
   Build_Android:
